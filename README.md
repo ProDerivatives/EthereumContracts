@@ -1,2 +1,2 @@
-# Etherium
-Ether-based derivative contracts
+# Ethereum
+Ethereum-based derivative contracts

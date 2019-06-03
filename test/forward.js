@@ -36,12 +36,12 @@ contract('Forward', function(accounts) {
   
         await account1.sendTransaction({from: trader1, value: Web3Utils.toWei('1', 'ether')});
         await account2.sendTransaction({from: trader2, value: Web3Utils.toWei('1', 'ether')});
-  
+
         await account1.registerDerivativeAndPayFee(derivative.address, {from: trader1, gas: 500000});
         await account2.registerDerivativeAndPayFee(derivative.address, {from: trader2, gas: 500000});
   
-        await derivative.addVerifiedAccount(account1.address, {from: owner});
-        await derivative.addVerifiedAccount(account2.address, {from: owner});
+        await derivative.addVerifiedAccount(account1.address, {from: owner, gas: 500000});
+        await derivative.addVerifiedAccount(account2.address, {from: owner, gas: 500000});
     });
 
     it('Account1 should not be in default', async () => {

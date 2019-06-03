@@ -1,5 +1,5 @@
 /**
-* © Copyright 2019 Steffen Lehmann
+* © Copyright 2019 Steffen Lehmann slehmann@proderivatives.com
 * Deployment permitted
 **/
 
@@ -18,14 +18,14 @@ interface DerivativeProxy {
     function isExpired() external view returns (bool);
     function isInUse(address account) external view returns (bool);
     function isInDefault(address account) external view returns (bool); 
-    function getPosition(address account) external view returns (int32, int128); // notional, amount
+    function getPosition(address account) external view returns (int64, int128); // notional, amount
     function getBid(address account) external view returns (int32, int64);    // notional, price
     function getAsk(address account) external view returns (int32, int64);    // notional, price
-    function getCollateralRequirement(int32 positionNotional, int128 positionValue, int32 bidNotional, int64 bidPrice, int32 askNotional, int64 askPrice) external view returns (int128);
+    function getCollateralRequirement(int64 positionNotional, int128 positionValue, int32 bidNotional, int64 bidPrice, int32 askNotional, int64 askPrice) external view returns (int128);
     function goLong(int32 notional, int64 xp) external;
     function goShort(int32 notional, int64 xp) external;
     function transferNotional(address recipient, int32 notional) external;    // Transfer notional value, i.e. pay fixed amount of the underlying
-    function payFee() payable external;
+    function payFee() external payable;
 }
 
 /**
@@ -127,12 +127,12 @@ contract Account {
 
     function getCollateralRequirement(address derivative) public view returns (int128) {
         DerivativeProxy proxy = DerivativeProxy(derivative);
-        (int32 posNotional, int128 posAmount) = proxy.getPosition(address(this));
+        (int64 positionNotional, int128 positionAmount) = proxy.getPosition(address(this));
         if (proxy.isExpired())
-            return proxy.getCollateralRequirement(posNotional, posAmount, 0, 0, 0, 0);
+            return proxy.getCollateralRequirement(positionNotional, positionAmount, 0, 0, 0, 0);
         (int32 bidNotional, int64 bidPrice) = proxy.getBid(address(this));
         (int32 askNotional, int64 askPrice) = proxy.getAsk(address(this));
-        return proxy.getCollateralRequirement(posNotional, posAmount, bidNotional, bidPrice, askNotional, askPrice);
+        return proxy.getCollateralRequirement(positionNotional, positionAmount, bidNotional, bidPrice, askNotional, askPrice);
     }
 
     function contractExists(address derivative) private view returns (bool) {
@@ -143,19 +143,19 @@ contract Account {
         return size > 0;
     }
 
-    function getTotalAllocated() public view returns (int128) {
-        int128 a = 0;
+    function getTotalAllocated() public view returns (uint256) {
+        uint256 a = 0;
         for (uint i = 0; i < derivatives.length; i++) {
             if (contractExists(derivatives[i])) {
-                a += getCollateralRequirement(derivatives[i]);
+                a += uint256(getCollateralRequirement(derivatives[i]));
             }
         }
-        return a; 
+        return a;
     }
 
     function getTotalAvailable() public view returns (uint256) {
         uint256 balance = address(this).balance;
-        uint256 allocated = uint256(getTotalAllocated());
+        uint256 allocated = getTotalAllocated();
         return balance > allocated ? balance - allocated : 0;
     }
 
@@ -169,15 +169,18 @@ contract Account {
     * Called by derivative on second consecutive default
     * We only pay if exposure amount is negative
     */
-    function closeOut() external onlyDerivative {
+    function closeOut(int32 notional) external onlyDerivative {
         DerivativeProxy proxy = DerivativeProxy(msg.sender);
-        (int32 notional, /* int64 amount */) = proxy.getPosition(address(this));
         // Derivative has not expired, account is in default and collateral requirement is positive (only close out positions that require collateral)
         require(!proxy.isExpired() && proxy.isInDefault(address(this)) && getCollateralRequirement(msg.sender) > 0, "Not eligible for close out.");
-        if (notional > 0)
-           proxy.goShort(notional, proxy.getLowEstimate()); 
-        else
+        (int64 positionNotional, /* int64 amount */) = proxy.getPosition(address(this));
+        if (notional > 0) {
+           require(positionNotional >= notional, "Invalid attempt to close out more than available");
+           proxy.goShort(notional, proxy.getLowEstimate());
+        } else {
+           require(positionNotional <= notional, "Invalid attempt to close out more than available");
            proxy.goLong(-notional, proxy.getHighEstimate());
+        }
     }
 
     /**
@@ -187,7 +190,7 @@ contract Account {
     function settle(address payable destination, int128 amountToSend) external onlyDerivative {
         // amountToSend guaranteed to be positive number - enforced by derivative contract.
         DerivativeProxy proxy = DerivativeProxy(msg.sender);
-        (int32 notional, int128 amount) = proxy.getPosition(address(this));
+        (int64 notional, int128 amount) = proxy.getPosition(address(this));
         // Derivative has expired, position is closed and amountToSend does not exceed final position amount
         require(proxy.isExpired() && notional == 0 && amount < 0 && amountToSend <= -amount, "Not eligible for final settlement");
         destination.transfer(uint256(amountToSend));

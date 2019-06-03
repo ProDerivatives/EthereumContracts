@@ -1,5 +1,5 @@
 /**
-* © Copyright 2019 Steffen Lehmann
+* © Copyright 2019 Steffen Lehmann slehmann@proderivatives.com
 * Deployment not permitted except to local test networks
 **/
 
@@ -17,7 +17,7 @@ contract Forward is Derivative {
     * @dev Constructor
     */
     constructor(
-        uint32 contractExpirationTime, 
+        uint64 contractExpirationTime, 
         uint64 contractFee, 
         uint8 contractInitialMarginRate, 
         uint8 contractVariationMarginRate) public {
@@ -56,9 +56,9 @@ contract Forward is Derivative {
     * Close account that is in default
     * rules enforced by account contract
     */
-    function closeOut(address account) external {
+    function closeOut(address account, int32 notional) external {
         AccountProxy proxy = AccountProxy(account);
-        proxy.closeOut();
+        proxy.closeOut(notional);
     }
 
     /**

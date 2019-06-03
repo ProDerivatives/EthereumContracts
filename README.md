@@ -1,18 +1,29 @@
-# Ethereum
+# Ethereum Contracts
 Ethereum-based derivative contracts
 
 ## Test Contracts
+
+Clone this repository
+
 Open a command prompt, cd into the root directory of this repository and enter
 
+```
+npm install
+```
+```
 truffle develop
+```
 ```js
 truffle(develop)> test
 ```
 
 ## Interact with local Ethereum node
+
 Open a command prompt, cd into the root directory of this repository and enter
 
+```
 truffle console --network local
+```
 ```js
 truffle(local)> var deriv = await ManagedForward.at('0x077d476d70c492861e2140f47e93cccec467a189')
 
@@ -21,3 +32,5 @@ truffle(local)> deriv.getAccounts()
   '0x33f13AcfEFC4b9408c6Db5deA5F65aB6CCf2eef2' ]
   
 ```
+
+Edit truffle.js and add connection to your node if required. 

@@ -75,6 +75,19 @@ contract('ManagedForward', function(accounts) {
       assert.isFalse(isInDefault, 'Account is in default.');
     });
 
+    it('should be post orders', async () => {
+      let ask = await derivative.getLowestAsk();
+      let bid = await derivative.getHighestBid();
+      assert.equal(ask, 0, "Lowest ask not correct.");
+      assert.equal(bid, 0, "Highest bid not correct.");
+
+      await account1.goLong(derivative.address, 10000, 2900000000000000, {from: trader1});
+      await account2.goShort(derivative.address, 10000, 3100000000000000, {from: trader2});
+      ask = await derivative.getLowestAsk();
+      bid = await derivative.getHighestBid();
+      assert.equal(ask, 3100000000000000, "Lowest ask not correct.");
+      assert.equal(bid, 2900000000000000, "Highest bid not correct.");
+    });
 
     it('should be able to create position', async () => {
       const tx1 = await account1.goLong(derivative.address, 10000, 3000000000000000, {from: trader1});
@@ -242,6 +255,35 @@ contract('ManagedForward', function(accounts) {
       assert.equal(lowestAskPrice, 0, 'Lowest ask not correct ' + lowestAskPrice.toString());
       assert.equal(highestBidPrice, 0, 'Highest bid not correct ' + highestBidPrice.toString());
   
+    });
+
+    it('Trader4 can submit another sell order', async () => {
+      /*
+      const requirement = await account5.getCollateralRequirement(derivative.address);
+      console.log(`Requirement: ${requirement.toString()}`);
+      const alloc = await account5.getTotalAllocated();
+      console.log(`Allocated: ${alloc.toString()}`);
+      const avail = await account5.getTotalAvailable();
+      console.log(`Available: ${avail.toString()}`);
+      
+      const bid = await derivative.getBid(account5.address, {from: trader4});
+      const pos = await derivative.getPosition(account5.address, {from: trader4});
+
+      const nr = await derivative.getCollateralRequirement(pos[0], pos[1], bid[0], bid[1], 10, 20);
+      console.log(`New req: ${nr.toString()}`);
+      */
+
+      await account5.goShort(derivative.address, 10, 20, {from: trader4});
+
+      const ask = await derivative.getAsk(account5.address, {from: trader4});
+      assert.equal(ask[0], 10, 'Ask not correct ' + ask.toString());
+    });
+
+    it('Trader4 can cancel sell order', async () => {
+      await account5.goShort(derivative.address, 0, 0, {from: trader4});
+
+      const ask = await derivative.getAsk(account5.address, {from: trader4});
+      assert.equal(ask[0], 0, 'Ask not correct ' + ask.toString());
     });
 
     it('Trader3 can offset own bid', async () => {

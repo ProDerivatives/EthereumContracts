@@ -1,5 +1,5 @@
 /**
-* © Copyright 2019 Steffen Lehmann
+* © Copyright 2019 Steffen Lehmann slehmann@proderivatives.com
 * Deployment not permitted except to local test networks
 **/
 
@@ -8,7 +8,7 @@ pragma solidity ^0.5.0;
 interface AccountProxy {
     function getTotalAvailable() external view returns (uint256);
     function isInsufficientBalance() external view returns (bool);
-    function closeOut() external;
+    function closeOut(int32 notional) external;
     function settle(address destination, int128 amount) external;
 }
 
@@ -26,8 +26,8 @@ contract Derivative {
     mapping(address => Position) internal positions;
     mapping(address => Order) internal bids;
     mapping(address => Order) internal asks;
-    address private lowestAsk;
-    address private highestBid;
+    address public lowestAsk;
+    address public highestBid;
     uint64 public fee;
     uint64 public expirationTime; // Expiration DateTime code (UTC)
     uint64 public valuationTime; // Last valuation DateTime code (UTC)
@@ -36,7 +36,7 @@ contract Derivative {
     int64 public price;
                
     struct Position {
-        int32 notional; // Units of the undelying e.g. cents
+        int64 notional; // Units of the underlying e.g. cents
         int128 amount;    // Wei
     }
 
@@ -304,17 +304,21 @@ contract Derivative {
         return true;
     }
 
-    function getPosition(address account) external view returns (int32, int128) {
+    function getPosition(address account) external view returns (int64, int128) {
         return (positions[account].notional, positions[account].amount);
-    } 
+    }
 
     function getBid(address account) external view returns (int32, int64) {
         return (bids[account].notional, bids[account].price);
-    }  
+    }
+
+    function getHighestBid() external view returns (int64) { return bids[highestBid].price; }
 
     function getAsk(address account) external view returns (int32, int64) {
         return (asks[account].notional, asks[account].price);
     }
+
+    function getLowestAsk() external view returns (int64) { return asks[lowestAsk].price; }
 
     function getHighEstimate() public view returns (int64) {
         return price * (100 + variationMarginRate) / 100;
@@ -328,13 +332,13 @@ contract Derivative {
         return int128(notional) * price + amount;
     }
 
-    function getVariationMargin(int32 notional, int128 amount) public view returns (int128) {
+    function getVariationMargin(int64 notional, int128 amount) public view returns (int128) {
         if (notional > 0)
             return -(int128(notional) * getLowEstimate() + amount);
         return -(int128(notional) * getHighEstimate() + amount);
     }
 
-    function getInitialMargin(int32 notional, int128 amount) public view returns (int128) {
+    function getInitialMargin(int64 notional, int128 amount) public view returns (int128) {
         if (notional == 0)
             return 0;
         if (amount > 0)
@@ -343,7 +347,7 @@ contract Derivative {
             return -amount * initialMarginRate / 100;
     }
 
-    function getMarginRequirement(int32 notional, int128 amount) public view returns (int128) {
+    function getMarginRequirement(int64 notional, int128 amount) public view returns (int128) {
         if (notional > 0 && amount >= 0) // Long position with no downside risk -> No margin requirement
             return 0;
 
@@ -363,7 +367,7 @@ contract Derivative {
         return requirement;  // All other cases
     }
 
-    function getCollateralRequirement(int32 positionNotional, int128 positionValue, int32 bidNotional, int64 bidPrice, int32 askNotional, int64 askPrice) public view returns (int128) {
+    function getCollateralRequirement(int64 positionNotional, int128 positionValue, int32 bidNotional, int64 bidPrice, int32 askNotional, int64 askPrice) public view returns (int128) {
         int128 posCol = getMarginRequirement(positionNotional, positionValue);
         int128 bidCol = getMarginRequirement(positionNotional + bidNotional, positionValue - int128(bidNotional) * bidPrice);
         int128 askCol = getMarginRequirement(positionNotional - askNotional, positionValue + int128(askNotional) * askPrice);
@@ -382,7 +386,7 @@ contract Derivative {
     *************************************************/
 
     function goLong(int32 notional, int64 bidPrice) external canTrade {
-        require(notional >= 0 && price >= 0, "Notional and Price must be non-negative");
+        require(notional >= 0 && bidPrice >= 0, "Notional and Price must be non-negative");
         require(preClearBid(msg.sender, notional, bidPrice), "Insufficient collateral");
         updateBid(msg.sender, notional, bidPrice);
         emit OrderPosted(msg.sender, notional, bidPrice);
@@ -390,7 +394,7 @@ contract Derivative {
     }
 
     function goShort(int32 notional, int64 askPrice) external canTrade {
-        require(notional >= 0 && price >= 0, "Notional and Price must be non-negative");
+        require(notional >= 0 && askPrice >= 0, "Notional and Price must be non-negative");
         require(preClearAsk(msg.sender, notional, askPrice), "Insufficient collateral");
         updateAsk(msg.sender, notional, askPrice);
         emit OrderPosted(msg.sender, -notional, askPrice);
@@ -410,7 +414,7 @@ contract Derivative {
     *****************************************************************/
 
     function setVerified(address account, bool isValid) public onlyOwner { verified[account] = isValid; }
-    
+
     function addVerifiedAccount(address account) external onlyOwner {
         for (uint i = 0; i < accounts.length; i++) {
             if (accounts[i] == account) {
@@ -419,8 +423,8 @@ contract Derivative {
         }
         accounts.push(account);
         setVerified(account, true);
-    } 
-    
+    }
+
     function transferOwnership(address payable newOwner) external onlyOwner {
         require(newOwner != address(0), "Invalid address");
         owner = newOwner;
@@ -437,7 +441,7 @@ contract Derivative {
     *************************************************/
 
     // sender will be added to accounts if not yet present by event handler
-    function payFee() payable external {
+    function payFee() external payable {
         fees[msg.sender] += msg.value;
         emit FeePaid(msg.sender, msg.value);
     }

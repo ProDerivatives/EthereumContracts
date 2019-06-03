@@ -1,5 +1,5 @@
 /**
-* © Copyright 2019 Steffen Lehmann
+* © Copyright 2019 Steffen Lehmann slehmann@proderivatives.com
 * Deployment not permitted except to local test networks
 **/
 
@@ -19,7 +19,7 @@ contract ManagedForward is Derivative {
     * @dev Constructor
     */
     constructor(
-        uint32 contractExpirationTime, 
+        uint64 contractExpirationTime, 
         uint8 contractDefaultTrigger, 
         uint64 contractFee) public {
 
@@ -37,7 +37,7 @@ contract ManagedForward is Derivative {
 
     function setVariationMarginRate(uint8 rate) external onlyOwner {variationMarginRate = rate; }
 
-    function markToMarket(uint32 currentTime, int64 currentPrice) external onlyOwner {
+    function markToMarket(uint64 currentTime, int64 currentPrice) external onlyOwner {
         valuationTime = currentTime;
         price = currentPrice;
     }
@@ -58,9 +58,9 @@ contract ManagedForward is Derivative {
     * Close account that is in default
     * rules enforced by account contract
     */
-    function closeOut(address account) external onlyOwner {
+    function closeOut(address account, int32 notional) external onlyOwner {
         AccountProxy proxy = AccountProxy(account);
-        proxy.closeOut();
+        proxy.closeOut(notional);
     }
 
     /**

@@ -228,43 +228,23 @@ contract Derivative {
         emit TradeCleared(longAccount, shortAccount, notional, xp);
     }
 
-    function getLastBid() private view returns (address) {
-        address current = highestBid;
-        while (bids[current].next != address(0)) {
-            current = bids[current].next;
-        }
-        return current;
-    }
-
-    function getLastAsk() private view returns (address) {
-        address current = lowestAsk;
-        while (asks[current].next != address(0)) {
-            current = asks[current].next;
-        }
-        return current;
-    }
-
     function removeClearedBids() private {
-        address lastBid = getLastBid();
         address current = highestBid;
         while (current != address(0) && bids[current].notional == 0) {
             bids[current].price = 0;
-            bids[lastBid].next = current;
-            lastBid = current;
-            bids[lastBid].next = address(0);
-            current = bids[current].next;
+            highestBid = bids[current].next;
+            bids[current].next = address(0);
+            current = highestBid;
         }
     }
 
     function removeClearedAsks() private {
-        address lastAsk = getLastAsk();
         address current = lowestAsk;
         while (current != address(0) && asks[current].notional == 0) {
             asks[current].price = 0;
-            asks[lastAsk].next = current;
-            lastAsk = current;
-            asks[lastAsk].next = address(0);
-            current = asks[current].next;
+            lowestAsk = asks[current].next;
+            asks[current].next = address(0);
+            current = lowestAsk;
         }
     }
 

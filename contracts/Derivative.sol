@@ -410,6 +410,11 @@ contract Derivative {
         owner = newOwner;
     }
 
+    function withdrawFee() external onlyOwner {
+        uint256 balance = address(this).balance;
+        owner.transfer(balance);
+    }
+
     function destroy() external onlyOwner {
         require(isExpired() && isSettled(), "Contract in use");
         selfdestruct(owner);
